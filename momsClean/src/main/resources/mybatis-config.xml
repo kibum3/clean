@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE configuration
+PUBLIC "-//mybatis.org//DTD Config 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-config.dtd">
+<configuration>
+
+	<!-- 데이터베이스의 컬럼명을 자바필드의 카멜 케이스와 자동 매핑 예) notice_title = noticeTitle-->
+	<!-- snake_case = 단어들을 밑줄로 구분하여 작성하는 명명 규칙 -->
+	<!-- camelCase = 단어들을 이어서 작성하되 첫 단어를 제외한 각 단어의 첫 글자를 대문자로 표기하는 명명 규칙 -->
+	<settings>
+		<setting name="mapUnderscoreToCamelCase" value="true" />
+	</settings>
+   
+	<!-- TypeAlias로 매핑 파일에서 반복적으로 사용될 패키지의 이름을 정의한다. -->
+	<typeAliases>
+		<package name="com.mom.admin.domain"/>
+	</typeAliases>
+
+</configuration>

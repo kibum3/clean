@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper
+	namespace="com.mom.admin.mapper.reference.ReferenceMapper">
+	<sql id="search">
+		<if test="searchType != null">
+			<if test="searchType == 'n'.toString()">
+				AND reference_No LIKE CONCAT('%',CONCAT(#{keyword}, '%'))
+			</if>
+			<if test="searchType == 't'.toString()">
+				AND reference_Title LIKE CONCAT('%',CONCAT(#{keyword},
+				'%'))
+			</if>
+			<if test="searchType == 'r'.toString()">
+				AND user_No IN (SELECT user_No FROM user_tbl WHERE
+				user_name LIKE
+				CONCAT('%',CONCAT(#{keyword}, '%')))
+			</if>
+			<if test="searchType == 'ca'.toString()">
+				AND (
+				reference_No LIKE CONCAT('%',CONCAT(#{keyword},
+				'%'))
+				OR
+				reference_Title LIKE CONCAT('%',CONCAT(#{keyword}, '%'))
+				OR
+				user_No
+				IN (SELECT user_No FROM user_tbl WHERE user_name LIKE
+				CONCAT('%',CONCAT(#{keyword}, '%')))
+				)
+			</if>
+		</if>
+	</sql>
+	<sql id="total_list">
+		<if test="searchType == null">
+			and rnum between #{sizePerPage} *#{page}-9
+			and
+			#{sizePerPage} *#{page}
+		</if>
+	</sql>
+
+
+	<select id="list" resultType="Reference">
+		<![CDATA[
+		 WITH paginated_references AS (
+		SELECT reference_no, user_no, reference_title ,
+		       reference_date, step , root , no, rownum as rnum
+		FROM (
+			SELECT reference_no, user_no, reference_title ,
+				   reference_date, step , root, no
+			FROM reference 
+			WHERE reference_no > 0
+			]]>
+		<include refid="search" />
+		<![CDATA[
+           order by root desc, reference_no asc, step desc) paginated
+           OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+          ) 
+          SELECT a.reference_no, a.user_no, a.reference_title,
+          		 b.user_name, a.reference_date, a.step , a.root , a.no
+          FROM paginated_references a inner join user_tbl b on a.user_no = b.user_no
+          WHERE a.reference_no > 0
+          order by a.root desc, a.reference_no asc, a.step desc
+          ]]>
+	</select>
+
+	<!-- 게시글 목록 전체 건수 조회 -->
+	<select id="count" resultType="int">
+		<![CDATA[
+			SELECT count(reference_no)
+			FROM reference
+			WHERE reference_no > 0
+		]]>
+		<include refid="search"></include>
+	</select>
+
+	<!-- 게시글 상세 -->
+	<select id="read" resultType="Reference">
+
+		select a.reference_no,
+		b.user_name,
+		b.user_phone,
+		a.reference_title,
+		a.reference_content,
+		a.reference_date,
+		a.step,
+		a.root,
+		a.no
+		from reference a inner join user_tbl b on a.user_no
+		=
+		b.user_no
+		where
+		reference_no = #{reference.referenceNo}
+
+	</select>
+	<!-- 답글 등록 -->
+	<insert id="create">
+			<![CDATA[
+			{CALL DECLARE BEGIN
+
+				UPDATE reference SET step = step + 1 
+				WHERE root = #{root} AND step > #{step};
+				
+				INSERT INTO reference (reference_no, user_no, reference_title, 
+							reference_content , reference_date, root,step, indent, no)
+				VALUES (reference_seq.NEXTVAL, 1, #{referenceTitle}, 
+				#{referenceContent},sysdate ,#{root},#{step} + 1, #{indent} + 1 , null);
+			END}
+			]]>
+	</insert>
+</mapper>

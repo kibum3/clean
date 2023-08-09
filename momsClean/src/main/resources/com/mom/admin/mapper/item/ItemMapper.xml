@@ -1,0 +1,136 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mom.admin.mapper.item.ItemMapper">
+
+	<!-- 상품 등록 -->
+	<insert id="create">
+		insert into item
+		(
+		i_no,
+		item_no,
+		item_division,
+		item_name,
+		item_price,
+		item_img,
+		item_img_thumb
+		)
+		values
+		(
+		item_seq.NEXTVAL,
+		LPAD(#{itemNo},2,'0'),
+		'상품',
+		#{itemName},
+		#{itemPrice},
+		#{itemImg},
+		#{itemImgThumb}
+		)
+	</insert>
+
+	<!-- 옵션 등록 -->
+	<insert id="createOption">
+		insert into item
+		(
+		i_no,
+		item_division,
+		item_name,
+		item_price
+		)
+		values
+		(
+		item_seq.NEXTVAL,
+		'옵션',
+		#{itemName},
+		#{itemPrice}
+		)
+	</insert>
+
+	<!-- 상품 조회 -->
+	<select id="list" resultType="Item">
+		<![CDATA[
+		select 
+			ITEM_No,
+			ITEM_NAME,
+			item_price
+		from item
+		where item_division = '상품'
+		order by i_no desc
+		]]>
+	</select>
+
+	<!-- 옵션 조회 -->
+	<select id="list2" resultType="Item">
+		<![CDATA[
+		select 
+			ITEM_NAME,
+			item_price
+		from item
+		where item_division = '옵션'
+		order by i_no desc
+		]]>
+	</select>
+
+	<!-- <select id="getINo" resultType="Integer"> <![CDATA[ select i_no from 
+		item where item_name = #{itemName} ]]> </select> -->
+
+	<!-- 수정 처리 -->
+	<update id="update">
+		update item
+		set
+		item_no = LPAD(#{itemNo}, 2, '0'),
+		item_name = #{itemName},
+		item_price = #{itemPrice},
+		item_img_thumb =
+		#{itemImgThumb},
+		item_img = #{itemImg}
+		where i_no = #{iNo}
+	</update>
+
+	<!-- 옵션 처리 -->
+	<update id="updateOption">
+		update item
+		set
+		item_name = #{itemName},
+		item_price =
+		#{itemPrice}
+		where i_no = #{iNo}
+	</update>
+
+	<select id="read" resultType="Item">
+		select
+		i_no,
+		item_No,
+		item_name,
+		item_price
+		from item
+		where item_no = #{itemNo}
+	</select>
+
+	<select id="optionRead" resultType="Item">
+		select
+		i_no,
+		item_name,
+		item_price
+		from item
+		where item_name = #{itemName}
+	</select>
+
+	<delete id="delete">
+		delete from item
+		where item_name = #{itemName}
+	</delete>
+
+	<!-- 원본 이미지 -->
+	<select id="getPicture" resultType="String">
+		select item_img
+		from item
+		where item_no = #{itemNo}
+	</select>
+
+	<!-- 썸네일 이미지 -->
+	<select id="getThumb" resultType="String">
+		select item_img_thumb
+		from item
+		where item_no = #{itemNo}
+	</select>
+</mapper>

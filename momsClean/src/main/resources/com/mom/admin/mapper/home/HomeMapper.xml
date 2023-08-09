@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN" 
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mom.admin.mapper.home.HomeMapper">
+
+	<sql id="total_list">
+		<if test="searchType == null">
+			and rnum between #{sizePerPage} *#{page}-9
+			and
+			#{sizePerPage} *#{page}
+		</if>
+	</sql>
+
+	<!-- <select id="list" resultType="Home">
+		<![CDATA[
+		 WITH paginated_references AS (
+		SELECT reference_no, user_no, reference_title ,reference_date , rownum as rnum
+		FROM (
+			SELECT reference_no, user_no, reference_title , reference_date 
+			FROM reference 
+			WHERE reference_no > 0 and TRUNC(reference_date) = TRUNC(sysdate)
+            ORDER BY user_no ASC) paginated
+           OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+          ) 
+          SELECT a.reference_no, a.user_no, a.reference_title, b.user_name, a.reference_date
+          FROM paginated_references a inner join user_tbl b on a.user_no = b.user_no
+          WHERE a.reference_no > 0 
+          ]]>
+	</select>
+	 -->
+	<select id="list" resultType="Home">
+		<![CDATA[
+		 WITH paginated_references AS (
+		SELECT reference_no, user_no, reference_title , reference_date, step , root , no, rownum as rnum
+		FROM (
+			SELECT reference_no, user_no, reference_title , reference_date, step , root, no
+			FROM reference 
+			WHERE reference_no > 0 and TRUNC(reference_date) = TRUNC(sysdate)
+			
+           order by root desc, reference_no asc, step desc) paginated
+           OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+          ) 
+          SELECT a.reference_no, a.user_no, a.reference_title, b.user_name, a.reference_date, a.step , a.root , a.no
+          FROM paginated_references a inner join user_tbl b on a.user_no = b.user_no
+          WHERE a.reference_no > 0
+          order by a.root desc, a.reference_no asc, a.step desc
+          ]]>
+	</select>
+	
+	<!-- 답글 등록 -->
+	<insert id="create">
+		
+		<!-- 원글의 step보다 더 큰 step을 가진 글이 있다면 그 글들의 step을 먼저 +1 한다. -->
+		<![CDATA[
+			{CALL DECLARE BEGIN
+
+				UPDATE reference SET step = step + 1 
+				WHERE root = #{root} AND step > #{step};
+				
+				INSERT INTO reference (reference_no, user_no, reference_title, reference_content , reference_date, root,step, indent, no)
+				VALUES (reference_seq.NEXTVAL, 1, #{referenceTitle}, #{referenceContent},sysdate ,#{root},#{step} + 1, #{indent} + 1 , null);
+			
+			
+			END}
+		]]>
+	</insert>
+	
+	<select id="review" resultType="Home">
+	 	<![CDATA[
+	 	WITH paginated_reviews AS (
+	 	select review_no, reserve_no, user_no, review_grade, review_content, review_date
+		from (SELECT review_no, reserve_no, user_no, review_grade, review_content, review_date, rownum as rnum
+		  FROM (select review_no, reserve_no, user_no, review_grade, review_content, review_date
+		  		from review
+		  		order by review_no desc)
+		 where review_no > 0 and TRUNC(review_date) = TRUNC(sysdate)
+		order by review_no desc) paginated
+		OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    		)
+    	SELECT review_no, reserve_no, user_no, review_grade, review_content, review_date
+    	FROM paginated_reviews
+    	where review_no > 0
+    	order by review_no desc
+		]]>
+	</select>
+
+	<!-- 게시글 목록 전체 건수 조회 -->
+	<select id="count" resultType="int">
+		<![CDATA[
+			SELECT count(reference_no)
+			FROM reference
+			WHERE reference_no > 0
+		]]>
+	</select>
+
+	<select id="request" resultType="Home">
+
+		<![CDATA[
+			SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request, rownum as rnum
+			FROM (
+				SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request
+				FROM reserve
+				WHERE reserve_state = '예약대기' and TRUNC(reserve_date) = TRUNC(sysdate)
+    		ORDER BY reserve_date ASC) 
+		]]>
+	</select>
+
+	<!-- 예약취소율 통계용 쿼리 -->
+	<select id="requestCount" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약대기'
+			AND reserve_request = '예약요청'
+			AND clean_done = 'N'
+		]]>
+	</select>
+	
+	<select id="reserveCount" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료'
+			AND clean_done = 'Y'
+		]]>
+	</select>
+
+	<select id="cancelCount" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '취소완료'
+			 AND clean_done = 'N'
+		]]>
+	</select>
+
+	<!-- 상품판매율 통계용 쿼리 -->
+	<select id="itemCount1" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '18%'
+		]]>
+	</select>
+	<select id="itemCount2" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '25%'
+		]]>
+	</select>
+	<select id="itemCount3" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '30%'
+		]]>
+	</select>
+	<select id="itemCount4" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '35%'
+		]]>
+	</select>
+	<select id="itemCount5" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '40%'
+		]]>
+	</select>
+	<select id="itemCount6" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND reserve_no LIKE '50%'
+		]]>
+	</select>
+	
+	<select id="itemSales1" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202301'
+		]]>
+	</select>
+	
+	<select id="itemSales2" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202302'
+		]]>
+	</select>
+	
+	<select id="itemSales3" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202303'
+		]]>
+	</select>
+	
+	<select id="itemSales4" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202304'
+		]]>
+	</select>
+	
+	<select id="itemSales5" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202305'
+		]]>
+	</select>
+	
+	<select id="itemSales6" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202306'
+		]]>
+	</select>
+	
+	<select id="itemSales7" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202307'
+		]]>
+	</select>
+	
+	<select id="itemSales8" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202308'
+		]]>
+	</select>
+	
+	<select id="itemSales9" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202309'
+		]]>
+	</select>
+	
+	<select id="itemSales10" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202310'
+		]]>
+	</select>
+	
+	<select id="itemSales11" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202311'
+		]]>
+	</select>
+	
+	<select id="itemSales12" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202312'
+		]]>
+	</select>
+	
+	<select id="optionSales1" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202301'
+		]]>
+	</select>
+	
+	<select id="optionSales2" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202302'
+		]]>
+	</select>
+	<select id="optionSales3" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202303'
+		]]>
+	</select>
+	<select id="optionSales4" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202304'
+		]]>
+	</select>
+	<select id="optionSales5" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202305'
+		]]>
+	</select>
+	<select id="optionSales6" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202306'
+		]]>
+	</select>
+	<select id="optionSales7" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202307'
+		]]>
+	</select>
+	<select id="optionSales8" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202308'
+		]]>
+	</select>
+	<select id="optionSales9" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202309'
+		]]>
+	</select>
+	<select id="optionSales10" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202310'
+		]]>
+	</select>
+	<select id="optionSales11" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202311'
+		]]>
+	</select>
+	<select id="optionSales12" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202312'
+		]]>
+	</select>
+	
+	<select id="totalSales1" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202301'
+		]]>
+	</select>
+	<select id="totalSales2" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202302'
+		]]>
+	</select>
+	<select id="totalSales3" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202303'
+		]]>
+	</select>
+	<select id="totalSales4" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202304'
+		]]>
+	</select>
+	<select id="totalSales5" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202305'
+		]]>
+	</select>
+	<select id="totalSales6" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202306'
+		]]>
+	</select>
+	<select id="totalSales7" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202307'
+		]]>
+	</select>
+	<select id="totalSales8" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202308'
+		]]>
+	</select>
+	<select id="totalSales9" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202309'
+		]]>
+	</select>
+	<select id="totalSales10" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202310'
+		]]>
+	</select>
+	<select id="totalSales11" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202311'
+		]]>
+	</select>
+	<select id="totalSales12" resultType="int">
+		<![CDATA[
+			SELECT COALESCE(sum(reserve_item_price + reserve_option_price),0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y' AND TO_CHAR(reserve_date, 'YYYYMM') = '202312'
+		]]>
+	</select>
+	
+	<select id="monthlyReserveCount1" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202301'
+		]]>
+	</select>
+	<select id="monthlyReserveCount2" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202302'
+		]]>
+	</select>
+	<select id="monthlyReserveCount3" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202303'
+		]]>
+	</select>
+	<select id="monthlyReserveCount4" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202304'
+		]]>
+	</select>
+	<select id="monthlyReserveCount5" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202305'
+		]]>
+	</select>
+	<select id="monthlyReserveCount6" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202306'
+		]]>
+	</select>
+	<select id="monthlyReserveCount7" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202307'
+		]]>
+	</select>
+	<select id="monthlyReserveCount8" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202308'
+		]]>
+	</select>
+	<select id="monthlyReserveCount9" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202309'
+		]]>
+	</select>
+	<select id="monthlyReserveCount10" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202310'
+		]]>
+	</select>
+	<select id="monthlyReserveCount11" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202311'
+		]]>
+	</select>
+	<select id="monthlyReserveCount12" resultType="Integer">
+		<![CDATA[
+			SELECT COALESCE(count(reserve_date), 0)
+			FROM reserve
+			WHERE reserve_state = '예약완료' AND clean_done = 'Y'
+			AND TO_CHAR(reserve_date, 'YYYYMM') = '202312'
+		]]>
+	</select>
+</mapper>

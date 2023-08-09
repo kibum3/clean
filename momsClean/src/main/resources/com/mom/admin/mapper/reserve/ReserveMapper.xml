@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mom.admin.mapper.reserve.ReserveMapper">
+	<!-- 검색 조건을 나타내는 쿼리 조각 -->
+	<sql id="search">
+		<if test="searchType != null">
+			<if test="searchType == 'ca'.toString()">
+				AND (reserve_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+				OR user_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+				OR UPPER(user_id) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+				OR UPPER(user_name) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%')))
+			</if>
+			<if test="searchType == 'rno'.toString()">
+				AND reserve_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+			</if>
+			<if test="searchType == 'no'.toString()">
+				AND user_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+			</if>
+			<if test="searchType == 'id'.toString()">
+				AND UPPER(user_id) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+			</if>
+			<if test="searchType == 'na'.toString()">
+				AND UPPER(user_name) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+			</if>
+		</if>
+	</sql>
+	<sql id="total_list">
+		<if test="searchType == null">
+			AND rnum BETWEEN #{sizePerPage} * #{page} - 9
+			AND #{sizePerPage} * #{page}
+		</if>
+	</sql>
+
+	<!-- 승인요청리스트 조회 -->
+	<select id="request" resultType="Reserve">
+
+		<![CDATA[
+		WITH paginated_reserves_req AS (
+			SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request, rownum as rnum
+			FROM (
+				SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request
+				FROM reserve
+				WHERE reserve_state = '예약대기'
+		]]>
+		<include refid="search" />
+    	<![CDATA[
+    		ORDER BY reserve_date ASC) paginated
+    		OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    		)
+		SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request
+		FROM paginated_reserves_req
+		WHERE reserve_state = '예약대기'
+		ORDER BY reserve_date ASC
+		]]>
+	</select>
+	<!-- 승인요청리스트 전체 건수 조회 -->
+	<select id="count" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약대기'
+		]]>
+		<include refid="search" />
+	</select>
+	
+	<!-- 예약 상세조회 -->
+	<select id="read" resultType="Reserve">
+		SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_name, reserve_item_price, COALESCE(reserve_option_name, '없음') as reserve_option_name, reserve_option_price, reserve_date, clean_date, reserve_request, clean_done, cancel_date
+		FROM reserve
+		WHERE
+		reserve_no = #{reserveNo}
+	</select>
+	
+	<!-- 예약요청 승인처리 -->
+	<update id="requestApproval">
+		UPDATE reserve
+		SET reserve_request = '예약완료', reserve_state = '예약완료'
+		WHERE reserve_request = '예약요청' AND reserve_state = '예약대기'
+		AND reserve_no = #{reserveNo}
+	</update>
+	
+	<!-- 취소요청 승인처리 -->
+	<update id="cancelApproval">
+		UPDATE reserve
+		SET reserve_request = '취소완료', reserve_state = '취소완료', cancel_date = sysdate
+		WHERE reserve_request = '취소요청' AND reserve_state = '예약대기'
+		AND reserve_no = #{reserveNo}
+	</update>
+	
+	<!-- 예약완료리스트 조회 -->
+	<select id="complete" resultType="Reserve">
+		<![CDATA[
+		WITH paginated_reserves_cpl AS (
+			SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request, clean_done, rownum as rnum
+			FROM (
+				SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request, clean_done
+				FROM reserve
+				WHERE reserve_state = '예약완료' AND reserve_request = '예약완료'
+		]]>
+		<include refid="search" />
+		<![CDATA[
+				ORDER BY reserve_date ASC) paginated
+				OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    			)
+    		SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, reserve_request, clean_done
+    		FROM paginated_reserves_cpl
+    		WHERE reserve_state = '예약완료'
+    		ORDER BY reserve_date ASC
+		]]>
+	</select>
+	<!-- 예약완료리스트 전체 건수 조회 -->
+	<select id="count2" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '예약완료'
+		]]>
+		<include refid="search" />
+	</select>
+	
+	<!-- 예약완료 청소완료처리 -->
+	<update id="finishUpdate">
+		UPDATE reserve
+		SET clean_done = 'Y'
+		WHERE clean_done = 'N' AND reserve_request = '예약완료' AND reserve_state = '예약완료'
+		AND reserve_no = #{reserveNo}
+	</update>
+	
+	<!-- 예약완료 청소완료 취소처리 -->
+	<update id="finishCancel">
+		UPDATE reserve
+		SET clean_done = 'N'
+		WHERE clean_done = 'Y' AND reserve_request = '예약완료' AND reserve_state = '예약완료'
+		AND reserve_no = #{reserveNo}
+	</update>
+	
+	<!-- 예약완료 복구처리 -->
+	<update id="completeRestore">
+		UPDATE reserve
+		SET reserve_request = '예약요청', reserve_state = '예약대기'
+		WHERE reserve_request = '예약완료' AND reserve_state = '예약완료' AND NOT clean_done = 'Y'
+		AND reserve_no = #{reserveNo}
+	</update>
+	
+	<!-- 예약취소리스트 조회 -->
+	<select id="cancel" resultType="Reserve">
+		<![CDATA[
+		WITH paginated_reserves_cnl AS (
+			SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, cancel_date, reserve_request, rownum as rnum
+			FROM (
+				SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, cancel_date, reserve_request
+				FROM reserve
+				WHERE reserve_state = '취소완료' AND reserve_request = '취소완료'
+		]]>
+		<include refid="search" />
+		<![CDATA[
+				ORDER BY reserve_date ASC) paginated
+				OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    			)
+    		SELECT reserve_no, user_no, user_id, user_name, item_no, reserve_state, reserve_addr, reserve_item_price, reserve_option_price, reserve_date, clean_date, cancel_date, reserve_request
+    		FROM paginated_reserves_cnl
+    		WHERE reserve_state = '취소완료'
+    		ORDER BY reserve_date ASC
+		]]>
+	</select>
+	<!-- 예약취소리스트 전체 건수 조회 -->
+	<select id="count3" resultType="int">
+		<![CDATA[
+			SELECT count(reserve_no)
+			FROM reserve
+			WHERE reserve_state = '취소완료'
+		]]>
+		<include refid="search" />
+	</select>
+	<!-- 예약취소 복구처리 -->
+	<update id="cancelRestore">
+		UPDATE reserve
+		SET reserve_request = '취소요청', reserve_state = '예약대기'
+		WHERE reserve_request = '취소완료' AND reserve_state = '취소완료' AND NOT clean_done = 'Y'
+		AND reserve_no = #{reserveNo}
+	</update>
+</mapper>

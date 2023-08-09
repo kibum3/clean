@@ -1,0 +1,123 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+"http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="com.mom.admin.mapper.user.UserMapper">
+
+	<!-- 검색 조건을 나타내는 쿼리 조각 -->
+	<sql id="search">
+		<if test="searchType != null">
+			<if test="searchType == 'ca'.toString()">
+				AND (user_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+				OR
+				UPPER(user_id) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+				OR UPPER(user_name) LIKE
+				CONCAT('%', CONCAT(UPPER(#{keyword}), '%')))
+			</if>
+			<if test="searchType == 'no'.toString()">
+				AND user_no LIKE CONCAT('%', CONCAT(#{keyword}, '%'))
+			</if>
+			<if test="searchType == 'id'.toString()">
+				AND UPPER(user_id) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+			</if>
+			<if test="searchType == 'na'.toString()">
+				AND UPPER(user_name) LIKE CONCAT('%', CONCAT(UPPER(#{keyword}), '%'))
+			</if>
+		</if>
+	</sql>
+	<sql id="total_list">
+		<if test="searchType == null">
+			AND rnum BETWEEN #{sizePerPage} * #{page} - 9
+			AND	#{sizePerPage} * #{page}
+		</if>
+	</sql>
+
+	<!-- 회원리스트 조회 -->
+	<select id="list" resultType="User">
+    <![CDATA[
+    WITH paginated_users AS (
+        SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division, rownum as rnum
+        FROM (
+            SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division
+            FROM user_tbl
+            WHERE user_division = '유지'
+    ]]>
+    <include refid="search" />
+    <![CDATA[
+            ORDER BY user_no ASC) paginated
+        	OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    		)
+    	SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division
+    	FROM paginated_users
+    	WHERE user_division = '유지'
+    	ORDER BY user_no ASC
+	]]>
+</select>
+
+	<!-- 회원리스트 전체 건수 조회 -->
+	<select id="count" resultType="int">
+		<![CDATA[
+			SELECT count(user_no)
+			FROM user_tbl
+			WHERE user_division = '유지'
+		]]>
+		<include refid="search" />
+	</select>
+
+	<!-- 탈퇴회원리스트 조회 -->
+	<select id="withdraw" resultType="User">
+		
+	<![CDATA[
+   	WITH paginated_users AS (
+		SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division, withdraw_date, rownum as rnum
+		FROM (
+			SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division, withdraw_date
+            FROM user_tbl
+            WHERE user_division = '탈퇴'
+    ]]>
+	<include refid="search" />
+    <![CDATA[
+        	ORDER BY withdraw_date DESC) paginated
+        	OFFSET #{sizePerPage} * (#{page} - 1) ROWS FETCH NEXT #{sizePerPage} ROWS ONLY
+    		)
+    	SELECT user_no, user_id, user_name, user_phone, user_email, email_auth, reg_date, user_division, withdraw_date
+    	FROM paginated_users
+    	WHERE user_division = '탈퇴'
+    	ORDER BY withdraw_date DESC
+	]]>
+	</select>
+
+
+	<!-- 탈퇴회원리스트 전체 건수 조회 -->
+	<select id="count2" resultType="int">
+		<![CDATA[
+			SELECT count(user_no)
+			FROM user_tbl
+			WHERE user_division = '탈퇴'
+		]]>
+		<include refid="search" />
+	</select>
+	
+
+	<!-- 회원 상세조회 -->
+	<select id="read" resultType="User">
+		SELECT user_no, user_id, user_name,	user_phone, user_email, reg_date, user_division, withdraw_date
+		FROM user_tbl
+		WHERE
+		user_no = #{userNo}
+	</select>
+
+	<!-- 회원 탈퇴처리 -->
+	<update id="withdrawUpdate">
+		UPDATE user_tbl
+		SET user_division = '탈퇴', withdraw_date = sysdate
+		WHERE user_no = #{userNo} AND user_division = '유지'
+	</update>
+
+	<!-- 회원 복구처리 -->
+	<update id="restoreUpdate">
+		UPDATE user_tbl
+		SET user_division = '유지', withdraw_date = null
+		WHERE user_no = #{userNo} AND user_division = '탈퇴'
+	</update>
+</mapper>
